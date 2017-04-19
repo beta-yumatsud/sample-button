@@ -18,13 +18,14 @@ package com.example.androidthings.button;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.util.Log;
+import android.view.KeyEvent;
+import android.widget.Toast;
 
 import com.google.android.things.contrib.driver.button.Button;
 import com.google.android.things.contrib.driver.button.ButtonInputDriver;
 import com.google.android.things.pio.Gpio;
 import com.google.android.things.pio.PeripheralManagerService;
-import android.util.Log;
-import android.view.KeyEvent;
 
 import java.io.IOException;
 
@@ -42,11 +43,14 @@ public class ButtonActivity extends Activity {
 
     private Gpio mLedGpio;
     private ButtonInputDriver mButtonInputDriver;
+    private PubsubPublisher mPubsubPublisher;
+    private boolean mLock = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Log.i(TAG, "Starting ButtonActivity");
+        setContentView(R.layout.activity_main);
 
         PeripheralManagerService pioService = new PeripheralManagerService();
         try {
@@ -65,6 +69,17 @@ public class ButtonActivity extends Activity {
         } catch (IOException e) {
             Log.e(TAG, "Error configuring GPIO pins", e);
         }
+
+        // start Cloud PubSub Publisher if cloud credentials are present.
+        int credentialId = getResources().getIdentifier("credentials", "raw", getPackageName());
+        if (credentialId != 0) {
+            try {
+                mPubsubPublisher = new PubsubPublisher(this, "sample-button",
+                        BuildConfig.PROJECT_ID, BuildConfig.PUBSUB_TOPIC, credentialId);
+            } catch (IOException e) {
+                Log.e(TAG, "error creating pubsub publisher", e);
+            }
+        }
     }
 
     @Override
@@ -72,6 +87,7 @@ public class ButtonActivity extends Activity {
         if (keyCode == KeyEvent.KEYCODE_SPACE) {
             // Turn on the LED
             setLedValue(true);
+            sendrequest();
             return true;
         }
 
@@ -83,6 +99,7 @@ public class ButtonActivity extends Activity {
         if (keyCode == KeyEvent.KEYCODE_SPACE) {
             // Turn off the LED
             setLedValue(false);
+            mLock = false;
             return true;
         }
 
@@ -97,6 +114,20 @@ public class ButtonActivity extends Activity {
             mLedGpio.setValue(value);
         } catch (IOException e) {
             Log.e(TAG, "Error updating GPIO value", e);
+        }
+    }
+
+    /**
+     * リクエスト送信しちゃうぞ
+     */
+    private void sendrequest() {
+        // onKeyDownの間、ずっと通信されない用の対応
+        if (!mLock) {
+            mLock = true;
+            Toast.makeText(this, "Press attendance contact button!!", Toast.LENGTH_LONG).show();
+            if (mPubsubPublisher != null) {
+                mPubsubPublisher.start();
+            }
         }
     }
 
@@ -124,6 +155,11 @@ public class ButtonActivity extends Activity {
                 mLedGpio = null;
             }
             mLedGpio = null;
+        }
+
+        if (mPubsubPublisher != null) {
+            mPubsubPublisher.close();
+            mPubsubPublisher = null;
         }
     }
 }

@@ -28,7 +28,13 @@ android {
         versionName "1.0"
     }
     buildTypes {
+        debug {
+            buildConfigField "String", "PROJECT_ID", '"go-test-140218"'
+            buildConfigField "String", "PUBSUB_TOPIC", '"attendancebutton"'
+        }
         release {
+            initWith(buildTypes.debug)
+
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
@@ -38,4 +44,11 @@ android {
 dependencies {
     compile 'com.google.android.things.contrib:driver-button:0.2'
     provided 'com.google.android.things:androidthings:0.3-devpreview'
+
+    compile('com.google.api-client:google-api-client-android:1.22.0') {
+        exclude group: 'org.apache.httpcomponents'
+    }
+    compile('com.google.apis:google-api-services-pubsub:v1-rev12-1.22.0') {
+        exclude group: 'org.apache.httpcomponents'
+    }
 }
